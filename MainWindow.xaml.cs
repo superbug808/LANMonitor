@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using LANMonitor.Services;
+using LANMonitor.ViewModels;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -19,6 +21,11 @@ namespace LANMonitor
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new MainViewModel();
+
+            // Initialize DB on startup
+            var dbManager = new DatabaseManager();
+            dbManager.InitializeDatabase();
         }
     }
 }
