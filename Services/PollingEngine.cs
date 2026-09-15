@@ -57,6 +57,10 @@ namespace LANMonitor.Services
             double movingAverage = analyzer.GetMovingAverage();
             string newState = analyzer.DetermineState(degradationThresholdMs: 100); // 100ms threshold for LAN
 
+            // Assign results back to the model (triggers INotifyPropertyChanged for WPF)
+            device.MovingAverageMs = movingAverage;
+            device.CurrentState = newState;
+
             var previousState = _currentStates.GetOrAdd(device.IpAddress, "Unknown");
 
             // Only log to DB if the state has changed
