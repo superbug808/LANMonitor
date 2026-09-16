@@ -55,7 +55,9 @@
         </DataGrid>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-            <Button Content="Add Peripheral" Width="120" Height="35" Margin="0,0,10,0"/>
+            <Button Content="Add Peripheral" 
+            Command="{Binding AddDeviceCommand}" 
+            Width="120" Height="35" Margin="0,0,10,0"/>
             <Button Content="Export Logs" Width="120" Height="35"/>
         </StackPanel>
     </Grid>
