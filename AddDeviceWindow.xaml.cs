@@ -19,9 +19,23 @@ namespace LANMonitor
     /// </summary>
     public partial class AddDeviceWindow : Window
     {
+        public string DeviceName => TxtName.Text.Trim();
+        public string IpAddress => TxtIp.Text.Trim();
+
         public AddDeviceWindow()
         {
             InitializeComponent();
+        }
+
+        private void Save_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(DeviceName) || string.IsNullOrWhiteSpace(IpAddress))
+            {
+                MessageBox.Show("Please enter both a Device Name and an IP Address.", "Validation Error", MessageBoxButton.OK, MessageBoxError);
+                return;
+            }
+
+            DialogResult = true;
         }
     }
 }
