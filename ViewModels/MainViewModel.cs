@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
 
 namespace LANMonitor.ViewModels
 {
@@ -17,6 +19,7 @@ namespace LANMonitor.ViewModels
         private readonly CancellationTokenSource _cts;
 
         public ObservableCollection<MonitoredDevice> Devices { get; set; }
+        public ICommand AddDeviceCommand { get; }
 
         public MainViewModel()
         {
@@ -40,9 +43,40 @@ namespace LANMonitor.ViewModels
                 new MonitoredDevice { Id = 3, Name = "Google Public DNS", IpAddress = "8.8.8.8", CurrentState = "Unknown", MovingAverageMs = 0 }
             };
 
+            // Instantiate command for button binding
+            AddDeviceCommand = new RelayCommand(OpenAddDeviceDialog);
+
             // Launch background polling loop without blocking the UI thread
             Task.Run(() => _pollingEngine.StartMonitoringAsync(Devices.ToList(), _cts.Token));
         }
+
+        private void OpenAddDeviceDialog()
+        {
+            var dialog = new AddDeviceWindow
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                // Save to Database
+                int newId = _dbManager.AddDevice(dialog.DeviceName, dialog.IpAddress);
+
+                // Create Model instance
+                var newDevice = new MonitoredDevice
+                {
+                    Id = newId,
+                    Name = dialog.DeviceName,
+                    IpAddress = dialog.IpAddress,
+                    CurrentState = "Unknown",
+                    MovingAverageMs = 0
+                };
+
+                // Add to ObservableCollection so UI updates instantly
+                Devices.Add(newDevice);
+            }
+        }
+
         public void StopMonitoring()
         {
             _cts?.Cancel();
