@@ -49,5 +49,20 @@ namespace LANMonitor.Services
             cmd.Parameters.AddWithValue("$latency", averageLatency);
             cmd.ExecuteNonQuery();
         }
+
+        public int AddDevice(string name, string ipAddress)
+        {
+            using var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
+            connection.Open();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+            INSERT INTO Devices (Name, IpAddress) VALUES ($name, $ip);
+            SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("$name", name);
+            cmd.Parameters.AddWithValue("$ip", ipAddress);
+
+            long newId = (long)cmd.ExecuteScalar();
+            return (int)newId;
+        }
     }
 }

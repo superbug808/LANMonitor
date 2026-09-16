@@ -69,7 +69,7 @@ namespace LANMonitor.Services
                 _currentStates[device.IpAddress] = newState;
                 _dbManager.LogEvent(device.Id, newState, movingAverage);
 
-                // Here you would also fire an event to the WPF UI EventAggregator
+                // TODO: fire an event to the WPF UI EventAggregator
             }
         }
     }
