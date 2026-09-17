@@ -21,6 +21,8 @@ namespace LANMonitor.Models
         //public string CurrentState { get; set; } // Online, Degraded, Offline
         //public double MovingAverageMs { get; set; }
 
+        private double _uptimePercentage = 100.0;
+
         // Dynamic property: Triggers UI update when state changes
         public string CurrentState
         {
@@ -55,6 +57,21 @@ namespace LANMonitor.Models
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        // Dynamic property: Displays 24-hour uptime percentage (e.g., 99.8%)
+        public double UptimePercentage
+        {
+            get => _uptimePercentage;
+            set
+            {
+                if (_uptimePercentage != value)
+                {
+                    _uptimePercentage = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
     }
 
 }

@@ -1,12 +1,15 @@
 ﻿using LANMonitor.Models;
 using LANMonitor.Services;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -23,6 +26,8 @@ namespace LANMonitor.ViewModels
         private MonitoredDevice _selectedDevice;
 
         public ObservableCollection<MonitoredDevice> Devices { get; set; }
+
+        public ICommand ExportLogsCommand { get; }
 
         // Tracks the row highlighted in the WPF DataGrid
         public MonitoredDevice SelectedDevice
@@ -49,6 +54,8 @@ namespace LANMonitor.ViewModels
 
             _pollingEngine = new PollingEngine(_dbManager);
             _cts = new CancellationTokenSource();
+
+            ExportLogsCommand = new RelayCommand(ExportLogs);
 
             // Initial device list for live testing (replace/expand with real local IPs)
             Devices = new ObservableCollection<MonitoredDevice>
@@ -127,6 +134,48 @@ namespace LANMonitor.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void ExportLogs()
+        {
+            var events = _dbManager.GetAllEventsForExport();
+            if (events.Count == 0)
+            {
+                MessageBox.Show("No historical events available to export.", "Export Logs", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var saveFileDialog = new SaveFileDialog
+            {
+                Title = "Export Network Event Logs",
+                Filter = "CSV File (*.csv)|*.csv|JSON File (*.json)|*.json",
+                FileName = $"Network_Events_Export_{DateTime.Now:yyyyMMdd_HHmmss}"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                string filePath = saveFileDialog.FileName;
+
+                if (filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    string json = JsonSerializer.Serialize(events, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(filePath, json);
+                }
+                else
+                {
+                    var csvBuilder = new StringBuilder();
+                    csvBuilder.AppendLine("LogID,DeviceName,IPAddress,State,TimestampUTC,AvgLatencyMs");
+
+                    foreach (var log in events)
+                    {
+                        csvBuilder.AppendLine($"{log.Id},\"{log.DeviceName}\",{log.IpAddress},{log.State},{log.Timestamp:o},{log.AverageLatency:F1}");
+                    }
+
+                    File.WriteAllText(filePath, csvBuilder.ToString());
+                }
+
+                MessageBox.Show($"Logs successfully exported to:\n{filePath}", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
 
         public void StopMonitoring()

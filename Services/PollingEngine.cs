@@ -60,6 +60,7 @@ namespace LANMonitor.Services
             // Assign results back to the model (triggers INotifyPropertyChanged for WPF)
             device.MovingAverageMs = movingAverage;
             device.CurrentState = newState;
+            device.UptimePercentage = _dbManager.Get24HourUptimePercentage(device.Id);
 
             var previousState = _currentStates.GetOrAdd(device.IpAddress, "Unknown");
 
