@@ -31,7 +31,11 @@ namespace LANMonitor
         {
             if (string.IsNullOrWhiteSpace(DeviceName) || string.IsNullOrWhiteSpace(IpAddress))
             {
-                MessageBox.Show("Please enter both a Device Name and an IP Address.", "Validation Error", MessageBoxButton.OK, MessageBoxError);
+                MessageBox.Show(
+                    "Please enter both a Device Name and an IP Address.",
+                    "Validation Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error); // Updated enum
                 return;
             }
 
