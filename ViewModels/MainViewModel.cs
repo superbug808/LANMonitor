@@ -3,7 +3,9 @@ using LANMonitor.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,14 +14,32 @@ using System.Windows.Input;
 
 namespace LANMonitor.ViewModels
 {
-    public class MainViewModel
+    public class MainViewModel : INotifyPropertyChanged
     {
         private readonly DatabaseManager _dbManager;
         private readonly PollingEngine _pollingEngine;
         private readonly CancellationTokenSource _cts;
 
+        private MonitoredDevice _selectedDevice;
+
         public ObservableCollection<MonitoredDevice> Devices { get; set; }
+
+        // Tracks the row highlighted in the WPF DataGrid
+        public MonitoredDevice SelectedDevice
+        {
+            get => _selectedDevice;
+            set
+            {
+                if (_selectedDevice != value)
+                {
+                    _selectedDevice = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public ICommand AddDeviceCommand { get; }
+        public ICommand DeleteDeviceCommand { get; }
 
         public MainViewModel()
         {
@@ -45,6 +65,9 @@ namespace LANMonitor.ViewModels
 
             // Instantiate command for button binding
             AddDeviceCommand = new RelayCommand(OpenAddDeviceDialog);
+
+            // CanExecute check ensures button is only active when a device is selected
+            DeleteDeviceCommand = new RelayCommand(DeleteSelectedDevice, () => SelectedDevice != null);
 
             // Launch background polling loop without blocking the UI thread
             Task.Run(() => _pollingEngine.StartMonitoringAsync(Devices.ToList(), _cts.Token));
@@ -75,6 +98,35 @@ namespace LANMonitor.ViewModels
                 // Add to ObservableCollection so UI updates instantly
                 Devices.Add(newDevice);
             }
+        }
+
+        private void DeleteSelectedDevice()
+        {
+            if (SelectedDevice == null) return;
+
+            var result = MessageBox.Show(
+                $"Are you sure you want to remove '{SelectedDevice.Name}' ({SelectedDevice.IpAddress}) from monitoring?",
+                "Confirm Deletion",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                // 1. Delete from SQLite Database
+                _dbManager.DeleteDevice(SelectedDevice.Id);
+
+                // 2. Remove from ObservableCollection (DataGrid updates immediately)
+                Devices.Remove(SelectedDevice);
+
+                // 3. Reset selection
+                SelectedDevice = null;
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         public void StopMonitoring()

@@ -64,5 +64,16 @@ namespace LANMonitor.Services
             long newId = (long)cmd.ExecuteScalar();
             return (int)newId;
         }
+
+
+        public void DeleteDevice(int deviceId)
+        {
+            using var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
+            connection.Open();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM Devices WHERE Id = $id";
+            cmd.Parameters.AddWithValue("$id", deviceId);
+            cmd.ExecuteNonQuery();
+        }
     }
 }
