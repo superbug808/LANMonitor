@@ -35,6 +35,14 @@ namespace LANMonitor.Services
                     AverageLatency REAL
                 )";
             createLogsCmd.ExecuteNonQuery();
+
+            var createSettingsCmd = connection.CreateCommand();
+            createSettingsCmd.CommandText = @"
+                CREATE TABLE IF NOT EXISTS AppSettings (
+                    Key TEXT PRIMARY KEY,
+                    Value TEXT
+                )";
+            createSettingsCmd.ExecuteNonQuery();
         }
 
         public void LogEvent(int deviceId, string state, double averageLatency)
@@ -56,8 +64,8 @@ namespace LANMonitor.Services
             connection.Open();
             var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-            INSERT INTO Devices (Name, IpAddress) VALUES ($name, $ip);
-            SELECT last_insert_rowid();";
+                INSERT INTO Devices (Name, IpAddress) VALUES ($name, $ip);
+                SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("$name", name);
             cmd.Parameters.AddWithValue("$ip", ipAddress);
 
@@ -84,10 +92,10 @@ namespace LANMonitor.Services
             var cutoff = DateTime.UtcNow.AddHours(-24);
             var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-        SELECT State, Timestamp 
-        FROM NetworkEvents 
-        WHERE DeviceId = $id AND Timestamp >= $cutoff 
-        ORDER BY Timestamp ASC";
+                SELECT State, Timestamp 
+                FROM NetworkEvents 
+                WHERE DeviceId = $id AND Timestamp >= $cutoff 
+                ORDER BY Timestamp ASC";
             cmd.Parameters.AddWithValue("$id", deviceId);
             cmd.Parameters.AddWithValue("$cutoff", cutoff);
 
@@ -128,10 +136,10 @@ namespace LANMonitor.Services
 
             var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-        SELECT e.Id, d.Name, d.IpAddress, e.State, e.Timestamp, e.AverageLatency
-        FROM NetworkEvents e
-        LEFT JOIN Devices d ON e.DeviceId = d.Id
-        ORDER BY e.Timestamp DESC";
+                SELECT e.Id, d.Name, d.IpAddress, e.State, e.Timestamp, e.AverageLatency
+                FROM NetworkEvents e
+                LEFT JOIN Devices d ON e.DeviceId = d.Id
+                ORDER BY e.Timestamp DESC";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -148,6 +156,31 @@ namespace LANMonitor.Services
             }
 
             return records;
+        }
+
+        public string GetSetting(string key, string defaultValue = "")
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = $key";
+            cmd.Parameters.AddWithValue("$key", key);
+
+            var result = cmd.ExecuteScalar();
+            return result != null ? result.ToString() : defaultValue;
+        }
+
+        public void SaveSetting(string key, string value)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO AppSettings (Key, Value) VALUES ($key, $val)
+                ON CONFLICT(Key) DO UPDATE SET Value = $val";
+            cmd.Parameters.AddWithValue("$key", key);
+            cmd.Parameters.AddWithValue("$val", value ?? string.Empty);
+            cmd.ExecuteNonQuery();
         }
 
     }

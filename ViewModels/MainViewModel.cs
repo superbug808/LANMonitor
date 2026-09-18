@@ -43,8 +43,12 @@ namespace LANMonitor.ViewModels
             }
         }
 
+        //Properties for add and delete devices
         public ICommand AddDeviceCommand { get; }
         public ICommand DeleteDeviceCommand { get; }
+        
+        //Property for open settings
+        public ICommand OpenSettingsCommand { get; }
 
         public MainViewModel()
         {
@@ -78,6 +82,8 @@ namespace LANMonitor.ViewModels
 
             // Launch background polling loop without blocking the UI thread
             Task.Run(() => _pollingEngine.StartMonitoringAsync(Devices.ToList(), _cts.Token));
+
+            OpenSettingsCommand = new RelayCommand(OpenSettingsDialog);
         }
 
         private void OpenAddDeviceDialog()
@@ -176,6 +182,15 @@ namespace LANMonitor.ViewModels
 
                 MessageBox.Show($"Logs successfully exported to:\n{filePath}", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
+
+        private void OpenSettingsDialog()
+        {
+            var settingsWin = new SettingsWindow(_dbManager)
+            {
+                Owner = Application.Current.MainWindow
+            };
+            settingsWin.ShowDialog();
         }
 
         public void StopMonitoring()

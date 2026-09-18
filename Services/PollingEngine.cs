@@ -87,6 +87,17 @@ namespace LANMonitor.Services
                     {
                         _ = _notificationService.SendWebhookAlertAsync(TeamsWebhookUrl, device.Name, device.IpAddress, newState);
                     }
+
+                    // 3. Email Alert
+                    string smtpHost = _dbManager.GetSetting("SmtpHost");
+                    string fromEmail = _dbManager.GetSetting("FromEmail");
+                    string toEmail = _dbManager.GetSetting("ToEmail");
+                    int.TryParse(_dbManager.GetSetting("SmtpPort", "587"), out int port);
+
+                    if (!string.IsNullOrEmpty(smtpHost) && !string.IsNullOrEmpty(toEmail))
+                    {
+                        _ = _notificationService.SendEmailAlertAsync(smtpHost, port, fromEmail, "", toEmail, device.Name, device.IpAddress, newState);
+                    }
                 }
             }
         }

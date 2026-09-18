@@ -58,6 +58,7 @@
 
         <!-- Updated Control Bar with Export Logs Command Binding -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Settings" Command="{Binding OpenSettingsCommand}" Width="100" Height="35" Margin="0,0,10,0"/>
             <Button Content="Add Peripheral" Command="{Binding AddDeviceCommand}" Width="120" Height="35" Margin="0,0,10,0"/>
             <Button Content="Delete Peripheral" Command="{Binding DeleteDeviceCommand}" Width="120" Height="35" Margin="0,0,10,0" Background="#FF5252" Foreground="White"/>
             <Button Content="Export Logs" Command="{Binding ExportLogsCommand}" Width="120" Height="35"/>

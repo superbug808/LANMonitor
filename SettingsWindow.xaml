@@ -1,0 +1,56 @@
+﻿<Window x:Class="LANMonitor.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Notification &amp; Alert Settings" Height="420" Width="480"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Webhook Settings -->
+        <GroupBox Header="Webhook Configuration (Teams / Slack)" Grid.Row="0" Margin="0,0,0,15" Padding="10">
+            <StackPanel>
+                <TextBlock Text="Webhook URL:" Margin="0,0,0,5"/>
+                <TextBox x:Name="TxtWebhookUrl" Padding="5"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- SMTP Email Settings -->
+        <GroupBox Header="SMTP Email Configuration" Grid.Row="1" Margin="0,0,0,15" Padding="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="SMTP Host:" Grid.Row="0" Grid.Column="0" Margin="0,0,10,2"/>
+                <TextBox x:Name="TxtSmtpHost" Grid.Row="1" Grid.Column="0" Margin="0,0,10,10" Padding="5"/>
+
+                <TextBlock Text="Port:" Grid.Row="0" Grid.Column="1" Margin="0,0,0,2"/>
+                <TextBox x:Name="TxtSmtpPort" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10" Padding="5" Text="587"/>
+
+                <TextBlock Text="Sender Email / User:" Grid.Row="2" Grid.Column="0" Margin="0,0,10,2"/>
+                <TextBox x:Name="TxtFromEmail" Grid.Row="3" Grid.Column="0" Margin="0,0,10,0" Padding="5"/>
+
+                <TextBlock Text="Recipient Email:" Grid.Row="2" Grid.Column="1" Margin="0,0,0,2"/>
+                <TextBox x:Name="TxtToEmail" Grid.Row="3" Grid.Column="1" Padding="5"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+            <Button Content="Save Settings" Width="100" Height="32" Margin="0,0,10,0" IsDefault="True" Click="Save_Click"/>
+            <Button Content="Cancel" Width="80" Height="32" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
