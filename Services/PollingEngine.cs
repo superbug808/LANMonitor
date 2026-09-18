@@ -12,12 +12,17 @@ namespace LANMonitor.Services
     public class PollingEngine
     {
         private readonly DatabaseManager _dbManager;
+        private readonly NotificationService _notificationService;
         private readonly ConcurrentDictionary<string, SlidingWindowAnalyzer> _analyzers;
         private readonly ConcurrentDictionary<string, string> _currentStates;
+
+        // Optional Webhook URL (Replace with your actual Teams/Slack incoming webhook endpoint)
+        private const string TeamsWebhookUrl = "";
 
         public PollingEngine(DatabaseManager dbManager)
         {
             _dbManager = dbManager;
+            _notificationService = new NotificationService();
             _analyzers = new ConcurrentDictionary<string, SlidingWindowAnalyzer>();
             _currentStates = new ConcurrentDictionary<string, string>();
         }
@@ -71,6 +76,18 @@ namespace LANMonitor.Services
                 _dbManager.LogEvent(device.Id, newState, movingAverage);
 
                 // TODO: fire an event to the WPF UI EventAggregator
+                // Trigger alerts only when state deteriorates to Offline or Degraded
+                if (newState == "Offline" || newState == "Degraded")
+                {
+                    // 1. Toast Notification
+                    _notificationService.SendToastNotification(device.Name, device.IpAddress, newState);
+
+                    // 2. Webhook Notification (Fire and forget task)
+                    if (!string.IsNullOrEmpty(TeamsWebhookUrl))
+                    {
+                        _ = _notificationService.SendWebhookAlertAsync(TeamsWebhookUrl, device.Name, device.IpAddress, newState);
+                    }
+                }
             }
         }
     }
