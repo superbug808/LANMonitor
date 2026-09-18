@@ -1,11 +1,12 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace LANMonitor.Models
 {
@@ -22,6 +23,9 @@ namespace LANMonitor.Models
         //public double MovingAverageMs { get; set; }
 
         private double _uptimePercentage = 100.0;
+
+        // Stores rolling ping values for LiveCharts
+        public ObservableCollection<double> LatencyHistory { get; } = new ObservableCollection<double>();
 
         // Dynamic property: Triggers UI update when state changes
         public string CurrentState

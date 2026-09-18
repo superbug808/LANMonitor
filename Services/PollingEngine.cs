@@ -67,6 +67,16 @@ namespace LANMonitor.Services
             device.CurrentState = newState;
             device.UptimePercentage = _dbManager.Get24HourUptimePercentage(device.Id);
 
+            // Push point to chart history on UI thread
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                device.LatencyHistory.Add(latency >= 0 ? latency : 0);
+                if (device.LatencyHistory.Count > 30)
+                {
+                    device.LatencyHistory.RemoveAt(0);
+                }
+            });
+
             var previousState = _currentStates.GetOrAdd(device.IpAddress, "Unknown");
 
             // Only log to DB if the state has changed

@@ -1,5 +1,6 @@
 ﻿using LANMonitor.Services;
 using LANMonitor.ViewModels;
+using System.ComponentModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,6 +27,15 @@ namespace LANMonitor
             // Initialize DB on startup
             var dbManager = new DatabaseManager();
             dbManager.InitializeDatabase();
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                vm.StopMonitoring();
+            }
+            base.OnClosing(e);
         }
     }
 }

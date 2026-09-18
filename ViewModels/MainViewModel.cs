@@ -1,5 +1,9 @@
 ﻿using LANMonitor.Models;
 using LANMonitor.Services;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using SkiaSharp;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -27,6 +31,9 @@ namespace LANMonitor.ViewModels
 
         public ObservableCollection<MonitoredDevice> Devices { get; set; }
 
+        public ISeries[] LatencySeries { get; set; }
+        public Axis[] YAxes { get; set; }
+
         public ICommand ExportLogsCommand { get; }
 
         // Tracks the row highlighted in the WPF DataGrid
@@ -39,6 +46,7 @@ namespace LANMonitor.ViewModels
                 {
                     _selectedDevice = value;
                     OnPropertyChanged();
+                    UpdateChart();
                 }
             }
         }
@@ -52,6 +60,26 @@ namespace LANMonitor.ViewModels
 
         public MainViewModel()
         {
+            // Initializing chart axis & empty series
+            YAxes = new Axis[]
+            {
+                new Axis
+                {
+                    Name = "Latency (ms)",
+                    MinLimit = 0
+                }
+            };
+
+            LatencySeries = new ISeries[]
+            {
+                new LineSeries<double>
+                {
+                    Values = new ObservableCollection<double>(),
+                    Fill = null,
+                    GeometrySize = 6,
+                    Stroke = new SolidColorPaint(SKColors.DodgerBlue, 2)
+                }
+            };
 
             _dbManager = new DatabaseManager();
             _dbManager.InitializeDatabase();
@@ -136,6 +164,15 @@ namespace LANMonitor.ViewModels
             }
         }
 
+        private void UpdateChart()
+        {
+            if (SelectedDevice != null && LatencySeries.Length > 0)
+            {
+                // Rebind chart series values to selected device's history
+                LatencySeries[0].Values = SelectedDevice.LatencyHistory;
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -192,6 +229,8 @@ namespace LANMonitor.ViewModels
             };
             settingsWin.ShowDialog();
         }
+
+
 
         public void StopMonitoring()
         {
