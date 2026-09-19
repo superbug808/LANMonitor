@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace LANMonitor.Services
@@ -13,6 +14,8 @@ namespace LANMonitor.Services
     {
         private readonly DatabaseManager _dbManager;
         private readonly NotificationService _notificationService;
+        private readonly TcpProbeEngine _tcpProbeEngine;
+        private readonly TracerouteEngine _tracerouteEngine;
         private readonly ConcurrentDictionary<string, SlidingWindowAnalyzer> _analyzers;
         private readonly ConcurrentDictionary<string, string> _currentStates;
 
@@ -23,6 +26,8 @@ namespace LANMonitor.Services
         {
             _dbManager = dbManager;
             _notificationService = new NotificationService();
+            _tcpProbeEngine = new TcpProbeEngine();
+            _tracerouteEngine = new TracerouteEngine();
             _analyzers = new ConcurrentDictionary<string, SlidingWindowAnalyzer>();
             _currentStates = new ConcurrentDictionary<string, string>();
         }
@@ -51,6 +56,13 @@ namespace LANMonitor.Services
                 if (reply.Status == IPStatus.Success)
                 {
                     latency = reply.RoundtripTime;
+
+                    // 1. TCP Port Probe (Runs if device has a TargetPort specified, e.g., 80, 9100, 3389)
+                    if (device.TargetPort > 0)
+                    {
+                        var (isOpen, _) = await _tcpProbeEngine.ProbePortAsync(device.IpAddress, device.TargetPort, 1500);
+                        device.IsPortOpen = isOpen;
+                    }
                 }
             }
             catch
@@ -84,6 +96,33 @@ namespace LANMonitor.Services
             {
                 _currentStates[device.IpAddress] = newState;
                 _dbManager.LogEvent(device.Id, newState, movingAverage);
+
+                // 2. Automated Traceroute on State Transition (Triggers when host transitions into Offline)
+                if (newState == "Offline" && previousState != "Offline")
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var hops = await _tracerouteEngine.RunTracerouteAsync(device.IpAddress);
+                            string formattedLog = $"--- Automated Traceroute ({DateTime.Now:yyyy-MM-dd HH:mm:ss}) ---\n" +
+                                                 string.Join(Environment.NewLine, hops);
+                            
+                            // 1. Persist the traceroute log to SQLite
+                            _dbManager.UpdateTracerouteLog(device.Id, formattedLog);
+
+                            // Dispatch update to WPF UI thread safely
+                            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                            {
+                                device.LastTracerouteLog = formattedLog;
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[Traceroute Engine] Error: {ex.Message}");
+                        }
+                    });
+                }
 
                 // TODO: fire an event to the WPF UI EventAggregator
                 // Trigger alerts only when state deteriorates to Offline or Degraded

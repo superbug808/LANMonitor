@@ -1,4 +1,5 @@
-﻿using LANMonitor.Services;
+﻿using LANMonitor.Models;
+using LANMonitor.Services;
 using LANMonitor.ViewModels;
 using System.ComponentModel;
 using System.Text;
@@ -36,6 +37,18 @@ namespace LANMonitor
                 vm.StopMonitoring();
             }
             base.OnClosing(e);
+        }
+
+        private void DataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is DataGrid grid && grid.SelectedItem is MonitoredDevice selectedDevice)
+            {
+                var dialog = new TracerouteDialog(selectedDevice)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+                dialog.ShowDialog();
+            }
         }
     }
 }

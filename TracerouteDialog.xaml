@@ -1,0 +1,78 @@
+﻿<Window x:Class="LANMonitor.TracerouteDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Traceroute Diagnostic Log" 
+        Height="450" 
+        Width="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E" 
+        Foreground="#DCDCDC">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" 
+                   x:Name="DeviceHeaderTitle"
+                   Text="Traceroute Output" 
+                   FontSize="16" 
+                   FontWeight="Bold" 
+                   Foreground="#FFFFFF" 
+                   Margin="0,0,0,10"/>
+
+        <!-- Log Output Area -->
+        <Border Grid.Row="1" 
+                BorderBrush="#3F3F46" 
+                BorderThickness="1" 
+                CornerRadius="4" 
+                Background="#0F0F10">
+            <TextBox x:Name="TxtTracerouteLog" 
+                     IsReadOnly="True" 
+                     TextWrapping="NoWrap" 
+                     AcceptsReturn="True" 
+                     VerticalScrollBarVisibility="Auto" 
+                     HorizontalScrollBarVisibility="Auto" 
+                     FontFamily="Consolas" 
+                     FontSize="12" 
+                     Background="Transparent" 
+                     Foreground="#33FF66" 
+                     BorderThickness="0" 
+                     Padding="10"/>
+        </Border>
+
+        <!-- Action Bar -->
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    Margin="0,15,0,0">
+
+            <TextBlock x:Name="TxtStatusMessage" 
+                       Foreground="#888888" 
+                       VerticalAlignment="Center" 
+                       Margin="0,0,15,0" 
+                       Visibility="Collapsed"/>
+
+            <Button Content="Copy to Clipboard" 
+                    Width="130" 
+                    Height="32" 
+                    Margin="0,0,10,0" 
+                    Click="BtnCopy_Click" 
+                    Background="#2D2D30" 
+                    Foreground="White" 
+                    BorderBrush="#3F3F46"/>
+
+            <Button Content="Close" 
+                    Width="90" 
+                    Height="32" 
+                    IsCancel="True" 
+                    Click="BtnClose_Click" 
+                    Background="#3E3E42" 
+                    Foreground="White" 
+                    BorderBrush="#3F3F46"/>
+        </StackPanel>
+    </Grid>
+</Window>

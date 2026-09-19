@@ -1,9 +1,8 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using LANMonitor.Models;
+using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
 
 namespace LANMonitor.Services
 {
@@ -21,7 +20,9 @@ namespace LANMonitor.Services
                 CREATE TABLE IF NOT EXISTS Devices (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     IpAddress TEXT NOT NULL,
-                    Name TEXT NOT NULL
+                    Name TEXT NOT NULL,
+                    TargetPort INTEGER DEFAULT 0,
+                    LastTracerouteLog TEXT
                 )";
             createDevicesCmd.ExecuteNonQuery();
 
@@ -43,44 +44,136 @@ namespace LANMonitor.Services
                     Value TEXT
                 )";
             createSettingsCmd.ExecuteNonQuery();
+
+            // Safe dynamic migration for existing databases missing these columns
+            EnsureColumnExists(connection, "Devices", "TargetPort", "INTEGER DEFAULT 0");
+            EnsureColumnExists(connection, "Devices", "LastTracerouteLog", "TEXT");
+        }
+
+        private void EnsureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnType)
+        {
+            using var checkCmd = connection.CreateCommand();
+            checkCmd.CommandText = $"PRAGMA table_info({tableName});";
+
+            bool exists = false;
+            using (var reader = checkCmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (reader["name"].ToString().Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!exists)
+            {
+                using var alterCmd = connection.CreateCommand();
+                alterCmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnType};";
+                alterCmd.ExecuteNonQuery();
+            }
+        }
+
+        public List<MonitoredDevice> GetAllDevices()
+        {
+            var devices = new List<MonitoredDevice>();
+
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT Id, Name, IpAddress, TargetPort, LastTracerouteLog FROM Devices";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                devices.Add(new MonitoredDevice
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    IpAddress = reader.GetString(2),
+                    TargetPort = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                    LastTracerouteLog = reader.IsDBNull(4) ? string.Empty : reader.GetString(4)
+                });
+            }
+
+            return devices;
+        }
+
+        public int AddDevice(string name, string ipAddress, int targetPort = 0)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO Devices (Name, IpAddress, TargetPort) VALUES ($name, $ip, $port);
+                SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("$name", name);
+            cmd.Parameters.AddWithValue("$ip", ipAddress);
+            cmd.Parameters.AddWithValue("$port", targetPort);
+
+            long newId = (long)cmd.ExecuteScalar();
+            return (int)newId;
+        }
+
+        public void UpdateDevice(MonitoredDevice device)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE Devices 
+                SET Name = $name, 
+                    IpAddress = $ip, 
+                    TargetPort = $port
+                WHERE Id = $id";
+            cmd.Parameters.AddWithValue("$name", device.Name);
+            cmd.Parameters.AddWithValue("$ip", device.IpAddress);
+            cmd.Parameters.AddWithValue("$port", device.TargetPort);
+            cmd.Parameters.AddWithValue("$id", device.Id);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void UpdateTracerouteLog(int deviceId, string log)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "UPDATE Devices SET LastTracerouteLog = $log WHERE Id = $id";
+            cmd.Parameters.AddWithValue("$log", (object)log ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$id", deviceId);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public void DeleteDevice(int deviceId)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM Devices WHERE Id = $id";
+            cmd.Parameters.AddWithValue("$id", deviceId);
+            cmd.ExecuteNonQuery();
         }
 
         public void LogEvent(int deviceId, string state, double averageLatency)
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
+
             var cmd = connection.CreateCommand();
             cmd.CommandText = "INSERT INTO NetworkEvents (DeviceId, State, Timestamp, AverageLatency) VALUES ($id, $state, $time, $latency)";
             cmd.Parameters.AddWithValue("$id", deviceId);
             cmd.Parameters.AddWithValue("$state", state);
             cmd.Parameters.AddWithValue("$time", DateTime.UtcNow);
             cmd.Parameters.AddWithValue("$latency", averageLatency);
-            cmd.ExecuteNonQuery();
-        }
-
-        public int AddDevice(string name, string ipAddress)
-        {
-            using var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
-            connection.Open();
-            var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO Devices (Name, IpAddress) VALUES ($name, $ip);
-                SELECT last_insert_rowid();";
-            cmd.Parameters.AddWithValue("$name", name);
-            cmd.Parameters.AddWithValue("$ip", ipAddress);
-
-            long newId = (long)cmd.ExecuteScalar();
-            return (int)newId;
-        }
-
-
-        public void DeleteDevice(int deviceId)
-        {
-            using var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
-            connection.Open();
-            var cmd = connection.CreateCommand();
-            cmd.CommandText = "DELETE FROM Devices WHERE Id = $id";
-            cmd.Parameters.AddWithValue("$id", deviceId);
             cmd.ExecuteNonQuery();
         }
 
@@ -162,6 +255,7 @@ namespace LANMonitor.Services
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
+
             var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = $key";
             cmd.Parameters.AddWithValue("$key", key);
@@ -174,6 +268,7 @@ namespace LANMonitor.Services
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
+
             var cmd = connection.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO AppSettings (Key, Value) VALUES ($key, $val)
@@ -182,7 +277,6 @@ namespace LANMonitor.Services
             cmd.Parameters.AddWithValue("$val", value ?? string.Empty);
             cmd.ExecuteNonQuery();
         }
-
     }
 
     public class NetworkEventRecord

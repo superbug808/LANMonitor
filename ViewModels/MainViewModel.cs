@@ -1,5 +1,6 @@
 ﻿using LANMonitor.Models;
 using LANMonitor.Services;
+using LANMonitor.ViewModels;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
@@ -35,6 +36,235 @@ namespace LANMonitor.ViewModels
         public Axis[] YAxes { get; set; }
 
         public ICommand ExportLogsCommand { get; }
+        public ICommand AddDeviceCommand { get; }
+        public ICommand DeleteDeviceCommand { get; }
+        public ICommand OpenSettingsCommand { get; }
+        public ICommand ViewTracerouteCommand { get; }
+
+        // Tracks the row highlighted in the WPF DataGrid
+        public MonitoredDevice SelectedDevice
+        {
+            get => _selectedDevice;
+            set
+            {
+                if (_selectedDevice != value)
+                {
+                    _selectedDevice = value;
+                    OnPropertyChanged();
+                    UpdateChart();
+                }
+            }
+        }
+
+        public MainViewModel()
+        {
+            // 1. Initializing chart axis & empty series
+            YAxes = new Axis[]
+            {
+                new Axis
+                {
+                    Name = "Latency (ms)",
+                    MinLimit = 0
+                }
+            };
+
+            LatencySeries = new ISeries[]
+            {
+                new LineSeries<double>
+                {
+                    Values = new ObservableCollection<double>(),
+                    Fill = null,
+                    GeometrySize = 6,
+                    Stroke = new SolidColorPaint(SKColors.DodgerBlue, 2)
+                }
+            };
+
+            // 2. Database Initialization & Device Loading
+            _dbManager = new DatabaseManager();
+            _dbManager.InitializeDatabase();
+
+            var loadedDevices = _dbManager.GetAllDevices();
+
+            // Seed default entries if database is empty on first run
+            if (loadedDevices.Count == 0)
+            {
+                _dbManager.AddDevice("Localhost Loopback", "127.0.0.1", 0);
+                _dbManager.AddDevice("Primary Gateway", "192.168.1.1", 0);
+                _dbManager.AddDevice("Google Public DNS", "8.8.8.8", 0);
+                loadedDevices = _dbManager.GetAllDevices();
+            }
+
+            Devices = new ObservableCollection<MonitoredDevice>(loadedDevices);
+
+            // 3. Engine & Command Setup
+            _pollingEngine = new PollingEngine(_dbManager);
+            _cts = new CancellationTokenSource();
+
+            ExportLogsCommand = new RelayCommand(ExportLogs);
+            AddDeviceCommand = new RelayCommand(OpenAddDeviceDialog);
+            DeleteDeviceCommand = new RelayCommand(DeleteSelectedDevice, () => SelectedDevice != null);
+            OpenSettingsCommand = new RelayCommand(OpenSettingsDialog);
+            ViewTracerouteCommand = new RelayCommand(OpenTracerouteDialog, () => SelectedDevice != null);
+
+            // 4. Launch background polling loop without blocking the UI thread
+            Task.Run(() => _pollingEngine.StartMonitoringAsync(Devices.ToList(), _cts.Token));
+        }
+
+        private void OpenAddDeviceDialog()
+        {
+            var dialog = new AddDeviceWindow
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                // Retrieve TargetPort if dialog provides it, default to 0
+                int targetPort = 0;
+                var portProp = dialog.GetType().GetProperty("TargetPort");
+                if (portProp != null && portProp.GetValue(dialog) is int parsedPort)
+                {
+                    targetPort = parsedPort;
+                }
+
+                // Save to Database
+                int newId = _dbManager.AddDevice(dialog.DeviceName, dialog.IpAddress, targetPort);
+
+                // Create Model instance
+                var newDevice = new MonitoredDevice
+                {
+                    Id = newId,
+                    Name = dialog.DeviceName,
+                    IpAddress = dialog.IpAddress,
+                    TargetPort = targetPort,
+                    CurrentState = "Unknown",
+                    MovingAverageMs = 0
+                };
+
+                // Add to ObservableCollection so UI updates instantly
+                Devices.Add(newDevice);
+            }
+        }
+
+        private void DeleteSelectedDevice()
+        {
+            if (SelectedDevice == null) return;
+
+            var result = MessageBox.Show(
+                $"Are you sure you want to remove '{SelectedDevice.Name}' ({SelectedDevice.IpAddress}) from monitoring?",
+                "Confirm Deletion",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                // 1. Delete from SQLite Database
+                _dbManager.DeleteDevice(SelectedDevice.Id);
+
+                // 2. Remove from ObservableCollection
+                Devices.Remove(SelectedDevice);
+
+                // 3. Reset selection
+                SelectedDevice = null;
+            }
+        }
+
+        private void OpenTracerouteDialog()
+        {
+            if (SelectedDevice == null) return;
+
+            var dialog = new TracerouteDialog(SelectedDevice)
+            {
+                Owner = Application.Current.MainWindow
+            };
+            dialog.ShowDialog();
+        }
+
+        private void UpdateChart()
+        {
+            if (SelectedDevice != null && LatencySeries.Length > 0)
+            {
+                LatencySeries[0].Values = SelectedDevice.LatencyHistory;
+            }
+        }
+
+        private void ExportLogs()
+        {
+            var events = _dbManager.GetAllEventsForExport();
+            if (events.Count == 0)
+            {
+                MessageBox.Show("No historical events available to export.", "Export Logs", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var saveFileDialog = new SaveFileDialog
+            {
+                Title = "Export Network Event Logs",
+                Filter = "CSV File (*.csv)|*.csv|JSON File (*.json)|*.json",
+                FileName = $"Network_Events_Export_{DateTime.Now:yyyyMMdd_HHmmss}"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                string filePath = saveFileDialog.FileName;
+
+                if (filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    string json = JsonSerializer.Serialize(events, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(filePath, json);
+                }
+                else
+                {
+                    var csvBuilder = new StringBuilder();
+                    csvBuilder.AppendLine("LogID,DeviceName,IPAddress,State,TimestampUTC,AvgLatencyMs");
+
+                    foreach (var log in events)
+                    {
+                        csvBuilder.AppendLine($"{log.Id},\"{log.DeviceName}\",{log.IpAddress},{log.State},{log.Timestamp:o},{log.AverageLatency:F1}");
+                    }
+
+                    File.WriteAllText(filePath, csvBuilder.ToString());
+                }
+
+                MessageBox.Show($"Logs successfully exported to:\n{filePath}", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void OpenSettingsDialog()
+        {
+            var settingsWin = new SettingsWindow(_dbManager)
+            {
+                Owner = Application.Current.MainWindow
+            };
+            settingsWin.ShowDialog();
+        }
+
+        public void StopMonitoring()
+        {
+            _cts?.Cancel();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /*public class MainViewModel : INotifyPropertyChanged
+    {
+        private readonly DatabaseManager _dbManager;
+        private readonly PollingEngine _pollingEngine;
+        private readonly CancellationTokenSource _cts;
+
+        private MonitoredDevice _selectedDevice;
+
+        public ObservableCollection<MonitoredDevice> Devices { get; set; }
+
+        public ISeries[] LatencySeries { get; set; }
+        public Axis[] YAxes { get; set; }
+
+        public ICommand ExportLogsCommand { get; }
 
         // Tracks the row highlighted in the WPF DataGrid
         public MonitoredDevice SelectedDevice
@@ -57,6 +287,8 @@ namespace LANMonitor.ViewModels
         
         //Property for open settings
         public ICommand OpenSettingsCommand { get; }
+
+        public ICommand ViewTracerouteCommand { get; }
 
         public MainViewModel()
         {
@@ -236,5 +468,5 @@ namespace LANMonitor.ViewModels
         {
             _cts?.Cancel();
         }
-    }
+    }*/
 }
